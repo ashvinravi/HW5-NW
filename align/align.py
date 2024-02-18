@@ -96,8 +96,8 @@ class NeedlemanWunsch:
                     res_2 += 1
                 elif start is True and res_2 == len(residue_list):
                     break
-        return dict_sub
-
+        return dict_sub 
+    
     def align(self, seqA: str, seqB: str) -> Tuple[float, str, str]:
         """
         TODO
@@ -129,12 +129,47 @@ class NeedlemanWunsch:
         # TODO: Initialize matrix private attributes for use in alignment
         # create matrices for alignment scores, gaps, and backtracing
         pass
-
         
-        # TODO: Implement global alignment here
-        pass      		
-        		    
+        # alignment scores 
+        # M
+        self._align_matrix = -np.inf * np.ones([len(seqB) + 1, len(seqA) + 1])
+        self._align_matrix[0,0] = 0
+
+        # Ix
+        self._gapA_matrix = -np.inf * np.ones([len(seqB) + 1, len(seqA) + 1])
+        for i in range(0, len(seqB) + 1):
+            self._gapA_matrix[i,0] = self.gap_open + (i * self.gap_extend)
+        
+        # Iy
+        self._gapB_matrix = -np.inf * np.ones([len(seqB) + 1, len(seqA) + 1])
+        for j in range(0, len(seqA) + 1):
+            self._gapB_matrix[0,j] = self.gap_open + (j * self.gap_extend)
+        
+        # backtrace matrix 
+        self._back = -np.inf * np.ones([len(seqB) + 1, len(seqA) + 1])
+
+        for i in range(1, len(seqB) + 1):
+            for j in range(1, len(seqA) + 1):
+                key = tuple([seqA[j-1], seqB[i-1]])
+                match_score = self.sub_dict[key]
+                # update match/mismatch matrix
+                self._align_matrix[i,j] = max(self._align_matrix[i-1, j-1] + match_score,
+                                            self._gapA_matrix[i-1, j-1] + match_score, 
+                                            self._gapB_matrix[i-1, j-1] + match_score)
+                
+                #update gap A matrix
+                self._gapA_matrix[i,j] = max(self._align_matrix[i-1, j] + self.gap_open + self.gap_extend,
+                                            self._gapA_matrix[i-1, j] + self.gap_extend)
+                
+                self._gapB_matrix[i,j] = max(self._align_matrix[i, j-1] + self.gap_open + self.gap_extend,
+                                            self._gapB_matrix[i, j-1] + self.gap_extend)
+                
+                #update gap B matrix 
+                self._back[i,j] = np.argmax([self._align_matrix[i,j], self._gapA_matrix[i,j], self._gapB_matrix[i,j]])
+
+        print(self._back)
         return self._backtrace()
+
 
     def _backtrace(self) -> Tuple[float, str, str]:
         """
@@ -150,11 +185,31 @@ class NeedlemanWunsch:
          	(alignment score, seqA alignment, seqB alignment) : Tuple[float, str, str]
          		the score and corresponding strings for the alignment of seqA and seqB
         """
-        pass
+        
+        i = len(self._seqB)
+        j = len(self._seqA)
+        self.alignment_score = max(self._align_matrix[len(self._seqB), len(self._seqA)], 
+                                   self._gapA_matrix[len(self._seqB), len(self._seqA)],
+                                   self._gapB_matrix[len(self._seqB), len(self._seqA)])
+        print(self.alignment_score)
+        while (i > 0 or j > 0):
+            # 0 = diagonal, 1 up, 2 left
+            if self._back[i,j] == 0:
+                self.seqB_align = self._seqB[i-1] + self.seqB_align
+                self.seqA_align = self._seqA[j-1] + self.seqA_align 
+                i -= 1 
+                j -= 1
+            elif self._back[i,j] == 2:
+                self.seqA_align = self._seqA[j-1] + self.seqA_align
+                self.seqB_align = '-' + self.seqB_align
+                j -= 1
+            else:
+                self.seqB_align = self._seqB[i-1] + self.seqB_align 
+                self.seqA_align = '-' + self.seqA_align
+                i -= 1
 
         return (self.alignment_score, self.seqA_align, self.seqB_align)
-
-
+    
 def read_fasta(fasta_file: str) -> Tuple[str, str]:
     """
     DO NOT MODIFY THIS FUNCTION! IT IS ALREADY COMPLETE!
@@ -193,3 +248,7 @@ def read_fasta(fasta_file: str) -> Tuple[str, str]:
             elif is_header and not first_header:
                 break
     return seq, header
+
+seq1, _ = read_fasta("./data/test_seq1.fa")
+seq2, _ = read_fasta("./data/test_seq2.fa")
+
